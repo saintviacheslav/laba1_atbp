@@ -100,7 +100,6 @@ Then(
       throw new Error("Некорректная длительность подписки в ответе");
     }
 
-    // Проверяем корректность даты окончания через доменную функцию
     const expectedEndDate = calculateSubscriptionEndDate(
       body.startDate,
       months
