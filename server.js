@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const {
   calculateSubscriptionEndDate,
   calculateSubscriptionWithPayment
@@ -8,6 +9,7 @@ const PaymentProvider = require("./PaymentProvider");
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/status", (req, res) => {
   res.status(200).json({

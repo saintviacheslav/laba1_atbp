@@ -1,0 +1,213 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  unit-tests:
+    name: Unit | Node ${{ matrix.node-version }} | ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: coverage/
+          if-no-files-found: ignore
+
+      - name: Upload unit allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-unit-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: allure-results/
+          if-no-files-found: ignore
+
+  api-tests:
+    name: API | Node ${{ matrix.node-version }} | ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run API tests
+        run: npm run test:api
+
+      - name: Upload api allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-api-${{ matrix.os }}-node-${{ matrix.node-version }}
+          path: allure-results/
+          if-no-files-found: ignore
+
+  ui-tests:
+    name: UI | Node ${{ matrix.node-version }} | ${{ matrix.os }} | ${{ matrix.browser }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [18.x, 20.x, 22.x]
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/Library/Caches/ms-playwright
+            %USERPROFILE%\AppData\Local\ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers (Linux)
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Install Playwright browsers (Windows/macOS)
+        if: runner.os != 'Linux'
+        run: npx playwright install ${{ matrix.browser }}
+
+      - name: Run UI tests
+        run: npm run test:ui -- --project=${{ matrix.browser }}
+
+      - name: Upload playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}-${{ matrix.browser }}-node-${{ matrix.node-version }}
+          path: playwright-report/
+          if-no-files-found: ignore
+
+      - name: Upload ui allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-ui-${{ matrix.os }}-${{ matrix.browser }}-node-${{ matrix.node-version }}
+          path: allure-results/
+          if-no-files-found: ignore
+
+  allure-report:
+    name: Build Allure report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, api-tests, ui-tests]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Merge Allure results
+        run: |
+          mkdir -p merged-allure-results
+          find artifacts -type f \( -name "*.json" -o -name "*.txt" -o -name "*.xml" -o -name "*.png" -o -name "*.webm" \) -path "*/allure-*/*" -exec cp {} merged-allure-results/ \;
+
+      - name: Generate Allure report
+        run: npx allure generate merged-allure-results --clean -o allure-report
+
+      - name: Upload Allure report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          if-no-files-found: ignore
+
+      - name: Deploy Allure report to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
+          destination_dir: allure-reports/${{ github.run_number }}
+
+  notify:
+    name: Telegram notification
+    runs-on: ubuntu-latest
+    needs: [unit-tests, api-tests, ui-tests, allure-report]
+    if: always()
+    steps:
+      - name: Send Telegram message
+        if: secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          API_RESULT: ${{ needs.api-tests.result }}
+          UI_RESULT: ${{ needs.ui-tests.result }}
+          REPORT_RESULT: ${{ needs.allure-report.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          STATUS="FAILED"
+          if [ "$UNIT_RESULT" = "success" ] && [ "$API_RESULT" = "success" ] && [ "$UI_RESULT" = "success" ]; then
+            STATUS="PASSED"
+          fi
+          MESSAGE="CI: ${STATUS}%0AUnit: ${UNIT_RESULT}%0AAPI: ${API_RESULT}%0AUI: ${UI_RESULT}%0AAllure: ${REPORT_RESULT}%0ARun: ${RUN_URL}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "text=${MESSAGE}"

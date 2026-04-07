@@ -8,6 +8,8 @@ pnpm-debug.log*
 # Coverage and test output
 coverage/
 report.html
+playwright-report/
+test-results/
 
 # Environment and local config
 .env

@@ -1,15 +1,36 @@
 {
+  "name": "atbp-labs",
+  "version": "1.0.0",
+  "private": true,
   "devDependencies": {
     "@babel/core": "^7.28.6",
     "@babel/preset-env": "^7.28.6",
+    "@playwright/test": "^1.53.0",
     "babel-jest": "^30.2.0",
     "jest": "^30.2.0",
     "@cucumber/cucumber": "^11.0.0",
-    "supertest": "^7.0.0"
+    "supertest": "^7.0.0",
+    "allure-commandline": "^2.34.1",
+    "allure-cucumberjs": "^3.4.1",
+    "allure-jest": "^3.4.1",
+    "allure-playwright": "^3.4.1",
+    "wait-on": "^8.0.3"
   },
   "scripts": {
     "test": "jest",
-    "bdd": "cucumber-js --format summary --format html:report.html"
+    "test:unit": "jest --config=jest.config.allure.js",
+    "bdd": "cucumber-js --format summary --format html:report.html",
+    "test:api": "cucumber-js --config cucumber.js",
+    "ui:test": "playwright test",
+    "test:ui": "playwright test",
+    "ui:test:headed": "playwright test --headed",
+    "test:ui:headed": "playwright test --headed",
+    "ui:report": "playwright show-report",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
+    "allure:open": "allure open allure-report",
+    "allure:serve": "allure serve allure-results",
+    "test:all": "npm run test:unit && npm run test:api && npm run test:ui && npm run allure:generate",
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^5.2.1"

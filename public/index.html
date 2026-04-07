@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Продление подписки</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Продление подписки</h1>
+
+      <form id="subscription-form" class="card">
+        <label for="userId">ID пользователя</label>
+        <input id="userId" name="userId" type="text" placeholder="Например: user1" />
+
+        <label for="months">Тариф</label>
+        <select id="months" name="months">
+          <option value="1">1 месяц</option>
+          <option value="3">3 месяца</option>
+          <option value="6">6 месяцев</option>
+          <option value="12">12 месяцев</option>
+        </select>
+
+        <button id="extend-btn" type="submit">Продлить</button>
+      </form>
+
+      <section class="card">
+        <h2>Результат</h2>
+        <p id="result-text" data-testid="result-text">Ожидание запроса...</p>
+        <p id="error-text" data-testid="error-text" class="error"></p>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+  </html>
